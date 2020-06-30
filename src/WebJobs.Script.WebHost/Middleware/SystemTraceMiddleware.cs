@@ -52,11 +52,11 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Middleware
 
         private static string GetIdentities(HttpContext context)
         {
-            var sbIdentities = new StringBuilder();
-
             var identities = context.User.Identities.Where(p => p.IsAuthenticated);
             if (identities.Any())
             {
+                var sbIdentities = new StringBuilder();
+
                 foreach (var identity in identities)
                 {
                     if (sbIdentities.Length > 0)
@@ -76,9 +76,13 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Middleware
 
                 sbIdentities.Insert(0, "(");
                 sbIdentities.Append(")");
-            }
 
-            return sbIdentities.ToString();
+                return sbIdentities.ToString();
+            }
+            else
+            {
+                return string.Empty;
+            }
         }
     }
 }

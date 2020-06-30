@@ -341,7 +341,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Diagnostics
             private int _functionActivityFlushInterval;
             private CancellationTokenSource _etwTaskCancellationSource = new CancellationTokenSource();
             private ConcurrentQueue<FunctionMetrics> _functionMetricsQueue = new ConcurrentQueue<FunctionMetrics>();
-            private ConcurrentDictionary<string, RunningFunctionInfo> _runningFunctions = new ConcurrentDictionary<string, RunningFunctionInfo>();
+            private ConcurrentDictionary<Guid, RunningFunctionInfo> _runningFunctions = new ConcurrentDictionary<Guid, RunningFunctionInfo>();
             private bool _disposed = false;
             private IOptionsMonitor<AppServiceOptions> _appServiceOptions;
 
@@ -432,10 +432,9 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Diagnostics
                 var monitoringEvent = new FunctionMetrics(startedEvent.FunctionMetadata.Name, ExecutionStage.Started, 0);
                 _functionMetricsQueue.Enqueue(monitoringEvent);
 
-                var key = GetDictionaryKey(startedEvent.FunctionMetadata.Name, startedEvent.InvocationId);
                 var triggerType = startedEvent.FunctionMetadata.Trigger?.Type;
                 var value = new RunningFunctionInfo(startedEvent.FunctionMetadata.Name, startedEvent.InvocationId, startedEvent.Timestamp, startedEvent.Success, triggerType);
-                _runningFunctions.AddOrUpdate(key, value, (k, v) => value);
+                _runningFunctions.AddOrUpdate(startedEvent.InvocationId, value, (k, v) => value);
             }
 
             internal void FunctionCompleted(FunctionStartedEvent startedEvent)
@@ -445,8 +444,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Diagnostics
                 var monitoringEvent = new FunctionMetrics(startedEvent.FunctionMetadata.Name, functionStage, executionTimeInMS);
                 _functionMetricsQueue.Enqueue(monitoringEvent);
 
-                var key = GetDictionaryKey(startedEvent.FunctionMetadata.Name, startedEvent.InvocationId);
-                if (_runningFunctions.TryRemove(key, out RunningFunctionInfo functionInfo))
+                if (_runningFunctions.TryRemove(startedEvent.InvocationId, out RunningFunctionInfo functionInfo))
                 {
                     functionInfo.ExecutionStage = ExecutionStage.Finished;
                     functionInfo.Success = startedEvent.Success;
@@ -522,11 +520,6 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.Diagnostics
                         runningFunctionInfo.Success);
                     _linuxContainerActivityPublisher.PublishFunctionExecutionActivity(activity);
                 }
-            }
-
-            private static string GetDictionaryKey(string name, Guid invocationId)
-            {
-                return string.Format("{0}_{1}", name.ToString(), invocationId.ToString());
             }
 
             private void RaiseMetricsPerFunctionEvent()
